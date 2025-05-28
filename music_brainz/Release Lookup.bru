@@ -1,0 +1,19 @@
+meta {
+  name: Release Lookup
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://musicbrainz.org/ws/2/release/:release_mbid?inc=artist-credits+url-rels
+  body: none
+  auth: inherit
+}
+
+params:query {
+  inc: artist-credits+url-rels
+}
+
+params:path {
+  release_mbid: 8b64a5ea-e672-4428-9bfc-f0d35b4b3771
+}
