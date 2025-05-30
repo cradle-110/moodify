@@ -31,8 +31,8 @@ qdrant.recreate_collection(
 )
 
 # Store embeddings
-points = []
-for saved_track in saved_tracks.find().limit(100):
+for saved_track in saved_tracks.find().limit():
+    points = []
     text = f"{saved_track['track']['name']} by {saved_track['track']['artists'][0]['name']}"
 
     # Load image
@@ -66,18 +66,18 @@ for saved_track in saved_tracks.find().limit(100):
     ))
 
     # Create text point
-    # points.append(PointStruct(
-    #     id=str(uuid.uuid4()),
-    #     vector=text_vector,
-    #     payload={
-    #         "type": "text",
-    #         "track_id": track_id,
-    #         "track_name": saved_track["track"]["name"],
-    #         "artist_name": saved_track["track"]["artists"][0]["name"]
-    #     }
-    # ))
+    points.append(PointStruct(
+        id=str(uuid.uuid4()),
+        vector=text_vector,
+        payload={
+            "type": "text",
+            "track_id": track_id,
+            "track_name": saved_track["track"]["name"],
+            "artist_name": saved_track["track"]["artists"][0]["name"]
+        }
+    ))
 
-# Upload to Qdrant
-qdrant.upsert(collection_name=collection_name, points=points)
+    # Upload to Qdrant
+    qdrant.upsert(collection_name=collection_name, points=points)
 
-print(f"✅ Uploaded {len(points)} separate CLIP embeddings (text + image) to Qdrant")
+print(f"✅ Uploaded {len(saved_tracks) * 2} separate CLIP embeddings (text + image) to Qdrant")
