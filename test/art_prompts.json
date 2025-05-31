@@ -1,5 +1,7 @@
 {
-  [
-    "prompt": ""
+  "prompts": [
+    {
+      "prompt": ""
+    }
   ]
 }

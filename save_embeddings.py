@@ -31,8 +31,13 @@ qdrant.recreate_collection(
 )
 
 # Store embeddings
-for saved_track in saved_tracks.find().limit():
+count = 0
+for saved_track in saved_tracks.find():
     points = []
+    
+    if count % 100 == 0:
+        print(f"on track {count}")
+
     text = f"{saved_track['track']['name']} by {saved_track['track']['artists'][0]['name']}"
 
     # Load image
@@ -50,16 +55,13 @@ for saved_track in saved_tracks.find().limit():
     image_vector = outputs.image_embeds[0].cpu().numpy().tolist()
     text_vector = outputs.text_embeds[0].cpu().numpy().tolist()
 
-    # Shared identifier to relate image/text points
-    track_id = str(uuid.uuid4())
-
     # Create image point
     points.append(PointStruct(
         id=str(uuid.uuid4()),
         vector=image_vector,
         payload={
             "type": "image",
-            "track_id": track_id,
+            "track_id": saved_track['track']['id'],
             "track_name": saved_track["track"]["name"],
             "artist_name": saved_track["track"]["artists"][0]["name"]
         }
@@ -71,7 +73,7 @@ for saved_track in saved_tracks.find().limit():
         vector=text_vector,
         payload={
             "type": "text",
-            "track_id": track_id,
+            "track_id": saved_track['track']['id'],
             "track_name": saved_track["track"]["name"],
             "artist_name": saved_track["track"]["artists"][0]["name"]
         }
@@ -79,5 +81,6 @@ for saved_track in saved_tracks.find().limit():
 
     # Upload to Qdrant
     qdrant.upsert(collection_name=collection_name, points=points)
+    count += 1
 
 print(f"✅ Uploaded {len(saved_tracks) * 2} separate CLIP embeddings (text + image) to Qdrant")

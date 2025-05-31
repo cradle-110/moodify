@@ -15,7 +15,7 @@ client = QdrantClient(host="localhost", port=6333)
 collection_name = "clip_embeddings_separate"  # Or whatever you used when saving
 
 # --- Your prompt ---
-prompt = "vibrant pink tree with a simple sky background"
+prompt = "manga"
 
 # --- Create embedding ---
 inputs = processor(text=[prompt], return_tensors="pt", padding=True).to(device)
