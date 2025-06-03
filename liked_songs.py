@@ -2,6 +2,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from pymongo import MongoClient
 import requests
+import time
 
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
     client_id="744c0194864b419da63bde5738eab3f5",
@@ -22,7 +23,13 @@ while True:
     print(f"Fetching songs {offset} to {offset + limit}")
     batch = sp.current_user_saved_tracks(limit=limit, offset=offset)
     saved_tracks_batch = batch['items']
+    artist_infos = []
     for track in saved_tracks_batch:
+        time.sleep(0.2)
+        # get additional artist information
+        for artist in track['track']['artists']:
+            artist = sp.artist(artist['id'])
+            artist_infos.append(artist)
         # add album art
         album_art_url = track['track']['album']['images'][0]['url'] if track['track']['album']['images'] else None
         if album_art_url:
@@ -33,6 +40,7 @@ while True:
                 track['album_art_data'] = None
         else:
             track['album_art_data'] = None
+        track['artist_infos'] = artist_infos
     results.extend(saved_tracks_batch)
     if len(batch['items']) < limit:
         break
