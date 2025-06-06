@@ -6,8 +6,8 @@ import time
 import random
 
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
-    client_id="c23563670ff943438fdc616383e9f0ea",
-    client_secret="08e420d130d94312a20123663db0ec25",
+    client_id="744c0194864b419da63bde5738eab3f5",
+    client_secret="d44736a41bc2499980fc8db322e6f9f6",
     redirect_uri="http://localhost:5000/callback",
     scope="user-library-read"
 ))
@@ -43,7 +43,7 @@ while True:
     artist_infos = sp.artists(map(
         lambda track: track['track']['artists'][0]['id'],
         saved_tracks_batch
-    ))
+    ))['artists']
     for index, track in enumerate(saved_tracks_batch):
         album_art_url = track['track']['album']['images'][0]['url'] if track['track']['album']['images'] else None
 

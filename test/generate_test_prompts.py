@@ -26,9 +26,8 @@ for track in saved_tracks.find():
 
     Your output should be concise, with just the two prompts separated by a new line. No prefixes like "1." or bullet points.
 
-    The song for the provided album art is {track['track']['name']} by {track['track']['artists'][0]['name']}.
-    """
-    #  genres include (if any): {track['artist_infos'][0]['genres']}
+    The song for the provided album art is {track['track']['name']} by {track['track']['artists'][0]['name']}. genres include (if any): {track['artist_info']['genres']}"""
+    #  
     input = [
         {"role": "user", "content": prompt},
         {
@@ -52,6 +51,7 @@ for track in saved_tracks.find():
         }
     })
 
-with open("batch_input.jsonl", "w", encoding="utf-8") as f:
-    for item in requests:
-        f.write(json.dumps(item) + "\n")
+for batch, index in enumerate(range(0, len(requests), 500)):
+    with open(f"batch_input-{batch}.jsonl", "w", encoding="utf-8") as f:
+        for item in requests[index:index + 500]:
+            f.write(json.dumps(item) + "\n")
