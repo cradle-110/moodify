@@ -20,7 +20,9 @@ dependencies = [
     "ipywidgets (>=8.1.7,<9.0.0)",
     "jupyterlab-widgets (>=3.0.15,<4.0.0)",
     "jupyterlab (>=4.4.3,<5.0.0)",
-    "openai (>=1.83.0,<2.0.0)"
+    "openai (>=1.83.0,<2.0.0)",
+    "ollama (>=0.5.1,<0.6.0)",
+    "keras (>=3.10.0,<4.0.0)"
 ]
 
 

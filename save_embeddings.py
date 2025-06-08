@@ -18,6 +18,7 @@ processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
 # Device (GPU if available)
 device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Using device: {device}")
 model = model.to(device)
 
 # === Qdrant setup ===
