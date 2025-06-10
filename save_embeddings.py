@@ -39,7 +39,7 @@ for saved_track in saved_tracks.find():
     if count % 100 == 0:
         print(f"on track {count}")
 
-    text = f"{saved_track['track']['name']} by {saved_track['track']['artists'][0]['name']}"
+    text = f"{saved_track['track']['name']} by {saved_track['track']['artists'][0]['name']}. genres: "
 
     # Load image
     image = Image.open(BytesIO(saved_track['album_art_data'])).convert("RGB")
