@@ -13,7 +13,7 @@ dependencies = [
     "pymongo (>=4.13.0,<5.0.0)",
     "pillow (>=11.2.1,<12.0.0)",
     "torch (>=2.7.0,<3.0.0)",
-    "transformers (>=4.52.3,<5.0.0)",
+    "transformers (==4.51.3)",
     "qdrant-client (>=1.14.2,<2.0.0)",
     "uuid (>=1.30,<2.0)",
     "ipykernel (>=6.29.5,<7.0.0)",
@@ -22,7 +22,9 @@ dependencies = [
     "jupyterlab (>=4.4.3,<5.0.0)",
     "openai (>=1.83.0,<2.0.0)",
     "ollama (>=0.5.1,<0.6.0)",
-    "keras (>=3.10.0,<4.0.0)"
+    "keras (>=3.10.0,<4.0.0)",
+    "colpali-engine @ git+https://github.com/illuin-tech/colpali",
+    "playwright (>=1.52.0,<2.0.0)"
 ]
 
 

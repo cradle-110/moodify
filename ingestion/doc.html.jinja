@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+{% raw %}
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            background-color: #f9f9f9;
+            text-align: center;
+        }
+        .metadata {
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+        .caption {
+            font-style: italic;
+            margin-top: 8px;
+            color: #555;
+        }
+    </style>
+{% endraw %}
+</head>
+<body>
+    <div class="metadata">
+        <p><strong>Song:</strong> {{ song_name }}</p>
+        <p><strong>Artists:</strong> {{ artists | join(', ') }}</p>
+        <p><strong>Genres:</strong> {{ genres | join(', ') }}</p>
+    </div>
+    {% for image in image_data %}
+    <div>
+        <img src="data:image/png;base64,{{ image }}">
+        <div class="caption">album art</div>
+    </div>
+    {% endfor %}
+</body>
+</html>
