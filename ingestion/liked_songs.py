@@ -25,6 +25,7 @@ def save_user_saved_tracks(sp: Spotify, max_fetch: int):
     limit = 50
     offset = 0
     end_early = False
+    # TODO does not handle max_fetch being a multiple of limit
     while True:
         if limit + offset > max_fetch:
             limit = max_fetch - offset

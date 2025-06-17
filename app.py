@@ -7,6 +7,8 @@ import uvicorn
 import gradio as gr
 
 from ingestion.liked_songs import save_user_saved_tracks
+from ingestion.gen_docs import generate_docs
+from ingestion.colqwen2_embeddings import embed_tracks
 
 app = FastAPI()
 
@@ -66,14 +68,17 @@ app = gr.mount_gradio_app(app, login_demo, path="/login-demo")
 def greet(request: gr.Request):
     return f"Welcome to Gradio, {request.username}"
 
-def import_tracks(num_tracks: int, request: gr.Request):
-    # Simulate importing tracks
-    access_token = request.request.session.get('token_info')['access_token']
+def import_tracks(num_tracks: int, request: gr.Request, progress=gr.Progress()):
     # save tracks on mongo
+    progress(0, desc="Starting, pulling user's saved tracks...")
+    access_token = request.request.session.get('token_info')['access_token']
     saved_ids = save_user_saved_tracks(Spotify(auth=access_token), max_fetch=num_tracks)
     # generate documents for tracks
-
+    progress(1/3, desc="Tracks saved. Generating documents...")
+    generate_docs(saved_ids)
     # generate embeddings for documents
+    progress(2/3, desc="Documents generated. Computing embeddings...")
+    embed_tracks(saved_ids)
     return len(saved_ids)
 
 with gr.Blocks() as main_demo:
