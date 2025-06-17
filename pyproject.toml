@@ -12,7 +12,6 @@ dependencies = [
     "pydantic (>=2.11.5,<3.0.0)",
     "pymongo (>=4.13.0,<5.0.0)",
     "pillow (>=11.2.1,<12.0.0)",
-    "torch (>=2.7.0,<3.0.0)",
     "transformers (==4.51.3)",
     "qdrant-client (>=1.14.2,<2.0.0)",
     "uuid (>=1.30,<2.0)",
@@ -24,7 +23,13 @@ dependencies = [
     "ollama (>=0.5.1,<0.6.0)",
     "keras (>=3.10.0,<4.0.0)",
     "colpali-engine @ git+https://github.com/illuin-tech/colpali",
-    "playwright (>=1.52.0,<2.0.0)"
+    "playwright (>=1.52.0,<2.0.0)",
+    "torchvision (>=0.22.1,<0.23.0)",
+    "torchaudio (>=2.7.1,<3.0.0)",
+    "torch (>=2.7.1,<3.0.0)",
+    "gradio (>=5.34.0,<6.0.0)",
+    "authlib (>=1.6.0,<2.0.0)",
+    "itsdangerous (>=2.2.0,<3.0.0)"
 ]
 
 
@@ -36,3 +41,13 @@ build-backend = "poetry.core.masonry.api"
 package-mode = false
 
 
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+priority = "explicit"
+
+
+[tool.poetry.dependencies]
+torchvision = {source = "pytorch"}
+torchaudio = {source = "pytorch"}
+torch = {source = "pytorch"}
