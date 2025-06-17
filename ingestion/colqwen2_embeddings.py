@@ -1,8 +1,7 @@
 import torch
 from PIL import Image
 from transformers.utils.import_utils import is_flash_attn_2_available
-from pymongo import MongoClient
-from colpali_engine.models import ColQwen2, ColQwen2Processor
+
 from qdrant_client import QdrantClient, models
 from tqdm import tqdm
 import uuid
@@ -12,23 +11,11 @@ import numpy as np
 ## https://colab.research.google.com/github/qdrant/examples/blob/master/pdf-retrieval-at-scale/ColPali_ColQwen2_Tutorial.ipynb#scrollTo=o-fbK8jiR21K
 
 ## load mongo client
-mongo = MongoClient("mongodb://mongo:example@localhost:27017/")
-saved_tracks = mongo.raw_data.saved_tracks
+
 
 ## load qdrant client
-qdrant = QdrantClient("http://localhost:6333")
+
 collection_name = "colqwen2_embeddings"
-
-## load ColQwen2 model + processor
-model_name = "vidore/colqwen2-v1.0"
-
-model = ColQwen2.from_pretrained(
-    model_name,
-    torch_dtype=torch.bfloat16,
-    device_map="cuda:0",  # or "mps" if on Apple Silicon
-    attn_implementation="flash_attention_2" if is_flash_attn_2_available() else None,
-).eval()
-processor = ColQwen2Processor.from_pretrained(model_name)
 
 ## create qdrant collection if not exists
 qdrant.recreate_collection(

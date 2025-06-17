@@ -1,24 +1,10 @@
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+from spotipy import Spotify
 from pymongo import MongoClient
 import requests
 import time
 import random
 
-sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
-    client_id="744c0194864b419da63bde5738eab3f5",
-    client_secret="d44736a41bc2499980fc8db322e6f9f6",
-    redirect_uri="http://localhost:5000/callback",
-    scope="user-library-read"
-))
-
-client = MongoClient("mongodb://mongo:example@localhost:27017/")
-db = client.raw_data
-saved_tracks = db.saved_tracks
-
-results = []
-limit = 50
-offset = 0
+from storage.mongo import saved_tracks
 
 def retry_with_backoff(func, max_retries=5, base_delay=1.0, jitter=True):
     for attempt in range(max_retries):
@@ -34,39 +20,55 @@ def retry_with_backoff(func, max_retries=5, base_delay=1.0, jitter=True):
             print(f"Retrying in {delay:.2f} seconds after error: {e}")
             time.sleep(delay)
 
-while True:
-    print(f"Fetching songs {offset} to {offset + limit}")
-    batch = sp.current_user_saved_tracks(limit=limit, offset=offset)
-    saved_tracks_batch = batch['items']
+def save_user_saved_tracks(sp: Spotify, max_fetch: int):
+    results = []
+    limit = 50
+    offset = 0
+    end_early = False
+    while True:
+        if limit + offset > max_fetch:
+            limit = max_fetch - offset
+            end_early = True
+        print(f"Fetching songs {offset} to {offset + limit}")
+        batch = sp.current_user_saved_tracks(limit=limit, offset=offset)
+        saved_tracks_batch = [
+            item
+            for item in batch['items']
+            if saved_tracks.count_documents({"track.id": item['track']['id']}) == 0
+        ]
 
-    # artist info of each track's first listed artist
-    artist_infos = sp.artists(map(
-        lambda track: track['track']['artists'][0]['id'],
-        saved_tracks_batch
-    ))['artists']
-    for index, track in enumerate(saved_tracks_batch):
-        album_art_url = track['track']['album']['images'][0]['url'] if track['track']['album']['images'] else None
+        if len(saved_tracks_batch) > 0:
+            # artist info of each track's first listed artist
+            artist_infos = sp.artists(map(
+                lambda track: track['track']['artists'][0]['id'],
+                saved_tracks_batch
+            ))['artists']
+            for index, track in enumerate(saved_tracks_batch):
+                album_art_url = track['track']['album']['images'][0]['url'] if track['track']['album']['images'] else None
 
-        def fetch_album_art():
-            if not album_art_url:
-                raise ValueError("No album art URL found")
-            response = requests.get(album_art_url, timeout=10)
-            if response.status_code != 200:
-                raise Exception(f"HTTP {response.status_code} for {album_art_url}")
-            return response.content
+                def fetch_album_art():
+                    if not album_art_url:
+                        raise ValueError("No album art URL found")
+                    response = requests.get(album_art_url, timeout=10)
+                    if response.status_code != 200:
+                        raise Exception(f"HTTP {response.status_code} for {album_art_url}")
+                    return response.content
 
-        album_art_data = retry_with_backoff(fetch_album_art) if album_art_url else None
+                album_art_data = retry_with_backoff(fetch_album_art) if album_art_url else None
 
-        track['album_art_data'] = album_art_data
-        track['artist_info'] = artist_infos[index]
+                track['album_art_data'] = album_art_data
+                track['artist_info'] = artist_infos[index]
 
-    results.extend(saved_tracks_batch)
+            results.extend(saved_tracks_batch)
 
-    if len(batch['items']) < limit:
-        break
-    offset += limit
+        if len(batch['items']) < limit or end_early:
+            break
+        offset += limit
 
-
-# Save raw "SavedTrackObject" to mongodb
-saved_tracks.drop()
-saved_tracks.insert_many(results)
+    # Save raw "SavedTrackObject" to mongodb
+    if len(results) == 0:
+        print("No new tracks to save.")
+        return []
+    
+    saved_tracks.insert_many(results)
+    return [x['track']['id'] for x in results]
