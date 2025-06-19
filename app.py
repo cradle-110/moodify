@@ -9,7 +9,7 @@ import gradio as gr
 from ingestion.liked_songs import save_user_saved_tracks
 from ingestion.gen_docs import generate_docs
 from ingestion.colqwen2_embeddings import embed_tracks
-from storage.mongo import get_track_image
+from storage.mongo import get_track_image, get_track_document
 from models.colqwen2 import reranking_search_batch
 
 app = FastAPI()
@@ -83,11 +83,12 @@ def lookup_song(prompt: str, search_limit: int, prefetch_limit: int):
     result = reranking_search_batch(prompt, search_limit=search_limit, prefetch_limit=prefetch_limit)
     images = []
     for point in result.points:
-        caption = f"{point.payload['track_name']} - {point.score:.2f}"
+        caption = f"{point.payload['track_name']} - {point.score:.2f} - {point.payload['track_id']}"
         images.append((get_track_image(point.payload['track_id']), caption))
     return images
 
 with gr.Blocks() as main_demo:
+    images = gr.State([])
     m = gr.Markdown("Welcome to Gradio!") # gets overriden by greet
     with gr.Tab("Lookup Track"):
         with gr.Row():
@@ -96,11 +97,26 @@ with gr.Blocks() as main_demo:
         with gr.Row():
             prompt_input = gr.Textbox(label="Prompt", placeholder="Describe a track's album art")
             text_button = gr.Button("Search")
-        lookup_output = gr.Gallery(label="Search Results", rows=4, object_fit="contain")
+        with gr.Row():
+            lookup_images = gr.Gallery(label="Search Results", scale=3, object_fit="contain")
+            @gr.render(inputs=images)
+            def render_captions(images):
+                with gr.Column():
+                    gr.Markdown("Captions:")
+                    for i, (_, caption) in enumerate(images):
+                        with gr.Row():
+                            gr.Markdown(f"{i + 1}")
+                            gr.Textbox(caption, show_label=False, scale=4)
         text_button.click(
             lookup_song,
             inputs=[prompt_input, search_limit, prefetch_limit],
-            outputs=lookup_output
+            outputs=images
+        )
+        images.change(
+            # grab the underlying PIL image and make the gallery caption the index
+            lambda images: [ (img, f"{i + 1}") for i, (img, _) in enumerate(images) ],
+            inputs=images,
+            outputs=lookup_images
         )
     with gr.Tab("Import Library"):
         with gr.Row():
@@ -110,8 +126,15 @@ with gr.Blocks() as main_demo:
         import_button = gr.Button("Import")
         import_button.click(import_tracks, inputs=[num_tracks, import_all], outputs=num_imported)
     with gr.Tab("Document Lookup"):
-        doc_output = gr.Textbox(label="Document Content")
-        doc_button = gr.Button("Process Document")
+        with gr.Row():
+            track_id_input = gr.Textbox(label="Track ID", placeholder="Enter a track ID to view its document")
+        doc_button = gr.Button("Get Document")
+        doc_output = gr.Image(label="Document")
+        doc_button.click(
+            get_track_document,
+            inputs=track_id_input,
+            outputs=doc_output
+        )
     with gr.Row():
         auth_url = sp_oauth.get_authorize_url()
         login_button = gr.Button("Login", link=auth_url)
