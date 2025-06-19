@@ -5,6 +5,7 @@ from starlette.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 import uvicorn
 import gradio as gr
+import urllib.parse
 
 from ingestion.liked_songs import save_user_saved_tracks
 from ingestion.gen_docs import generate_docs
@@ -19,45 +20,46 @@ SPOTIFY_CLIENT_ID = "c23563670ff943438fdc616383e9f0ea"
 SPOTIFY_CLIENT_SECRET = "08e420d130d94312a20123663db0ec25"
 SECRET_KEY = os.environ.get('SECRET_KEY') or "a_very_secret_key"
 
-sp_oauth = SpotifyOAuth(
-    client_id=SPOTIFY_CLIENT_ID,
-    client_secret=SPOTIFY_CLIENT_SECRET,
-    redirect_uri="http://127.0.0.1:8000/auth",
-    scope="user-library-read,user-read-private"
-)
+user_tokens = {}
 
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
-
-def get_user(request: Request):
-    user = request.session.get('user')
-    if user:
-        return user['display_name']
-    return None
+# app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 @app.route('/auth')
 async def auth_callback(request: Request):
+    sp_oauth = SpotifyOAuth(
+        client_id=SPOTIFY_CLIENT_ID,
+        client_secret=SPOTIFY_CLIENT_SECRET,
+        redirect_uri="https://thankful-fine-orca.ngrok-free.app/auth",
+        scope="user-library-read,user-read-private",
+    )
     code = request.query_params.get('code')
-    token_info = sp_oauth.get_access_token(code)
-
+    token_info = sp_oauth.get_access_token(code=code, check_cache=False)
+    
     # Create Spotify client with user token
     sp = Spotify(auth=token_info['access_token'])
 
     # Retrieve current user details
     user_info = sp.current_user()
 
-    request.session['user'] = user_info
-    request.session['token_info'] = token_info
-    return RedirectResponse(url='/')
+    user_tokens[user_info['id']] = {
+        'tokens': token_info,
+        'user': user_info,
+        'sp': sp
+    }
+    return RedirectResponse(url=f"/?user_id={user_info['id']}")
 
 @app.route('/logout')
 async def logout(request: Request):
-    request.session.pop('user', None)
     return RedirectResponse(url='/')
 
 def check_user_login_status(request: gr.Request):
-    logged_in = request.request.session.get('user') is not None
+    user_id = request.query_params.get('user_id')
+    if user_id and user_id in user_tokens:
+        logged_in = True
+    else:
+        logged_in = False    
     if logged_in:
-        welcome_message = f"Welcome back, {request.request.session['user']['display_name']}!"
+        welcome_message = f"Welcome back, {user_tokens[user_id]['user']['display_name']}!"
     else:
         welcome_message = "Please log in to access your Spotify library."
     return (welcome_message, gr.update(visible=not logged_in), gr.update(visible=logged_in))
@@ -65,12 +67,13 @@ def check_user_login_status(request: gr.Request):
 def import_tracks(num_tracks: int, import_all: bool, request: gr.Request, progress=gr.Progress()):
     # save tracks on mongo
     progress(0, desc="Starting, pulling user's saved tracks...")
-    access_token = request.request.session.get('token_info')['access_token']
+    user_id = request.query_params.get('user_id')
+    sp = user_tokens[user_id]['sp']
     if import_all:
         max_fetch = None
     else:
         max_fetch = num_tracks
-    saved_ids = save_user_saved_tracks(Spotify(auth=access_token), max_fetch=max_fetch)
+    saved_ids = save_user_saved_tracks(sp, max_fetch=max_fetch)
     # generate documents for tracks
     progress(1/3, desc="Tracks saved. Generating documents...")
     generate_docs(saved_ids)
@@ -136,6 +139,12 @@ with gr.Blocks() as main_demo:
             outputs=doc_output
         )
     with gr.Row():
+        sp_oauth = SpotifyOAuth(
+            client_id=SPOTIFY_CLIENT_ID,
+            client_secret=SPOTIFY_CLIENT_SECRET,
+            redirect_uri="https://thankful-fine-orca.ngrok-free.app/auth",
+            scope="user-library-read,user-read-private",
+        )
         auth_url = sp_oauth.get_authorize_url()
         login_button = gr.Button("Login", link=auth_url)
         logout_button = gr.Button("Logout", link="/logout")
