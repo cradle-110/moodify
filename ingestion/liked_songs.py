@@ -20,14 +20,14 @@ def retry_with_backoff(func, max_retries=5, base_delay=1.0, jitter=True):
             print(f"Retrying in {delay:.2f} seconds after error: {e}")
             time.sleep(delay)
 
-def save_user_saved_tracks(sp: Spotify, max_fetch: int):
+def save_user_saved_tracks(sp: Spotify, max_fetch: int | None):
     results = []
     limit = 50
     offset = 0
     end_early = False
     # TODO does not handle max_fetch being a multiple of limit
     while True:
-        if limit + offset > max_fetch:
+        if max_fetch is not None and limit + offset >= max_fetch:
             limit = max_fetch - offset
             end_early = True
         print(f"Fetching songs {offset} to {offset + limit}")

@@ -9,6 +9,8 @@ import gradio as gr
 from ingestion.liked_songs import save_user_saved_tracks
 from ingestion.gen_docs import generate_docs
 from ingestion.colqwen2_embeddings import embed_tracks
+from storage.mongo import get_track_image
+from models.colqwen2 import reranking_search_batch
 
 app = FastAPI()
 
@@ -32,14 +34,6 @@ def get_user(request: Request):
         return user['display_name']
     return None
 
-@app.get('/')
-async def index(user: dict = Depends(get_user)):
-    if user:
-        return RedirectResponse(url='/gradio')
-    else:
-        auth_url = sp_oauth.get_authorize_url()
-        return RedirectResponse(url=auth_url)
-
 @app.route('/auth')
 async def auth_callback(request: Request):
     code = request.query_params.get('code')
@@ -53,26 +47,30 @@ async def auth_callback(request: Request):
 
     request.session['user'] = user_info
     request.session['token_info'] = token_info
-    return RedirectResponse(url='/gradio')
+    return RedirectResponse(url='/')
 
 @app.route('/logout')
 async def logout(request: Request):
     request.session.pop('user', None)
     return RedirectResponse(url='/')
 
-with gr.Blocks() as login_demo:
-    gr.Button("Login", link="/login")
+def check_user_login_status(request: gr.Request):
+    logged_in = request.request.session.get('user') is not None
+    if logged_in:
+        welcome_message = f"Welcome back, {request.request.session['user']['display_name']}!"
+    else:
+        welcome_message = "Please log in to access your Spotify library."
+    return (welcome_message, gr.update(visible=not logged_in), gr.update(visible=logged_in))
 
-app = gr.mount_gradio_app(app, login_demo, path="/login-demo")
-
-def greet(request: gr.Request):
-    return f"Welcome to Gradio, {request.username}"
-
-def import_tracks(num_tracks: int, request: gr.Request, progress=gr.Progress()):
+def import_tracks(num_tracks: int, import_all: bool, request: gr.Request, progress=gr.Progress()):
     # save tracks on mongo
     progress(0, desc="Starting, pulling user's saved tracks...")
     access_token = request.request.session.get('token_info')['access_token']
-    saved_ids = save_user_saved_tracks(Spotify(auth=access_token), max_fetch=num_tracks)
+    if import_all:
+        max_fetch = None
+    else:
+        max_fetch = num_tracks
+    saved_ids = save_user_saved_tracks(Spotify(auth=access_token), max_fetch=max_fetch)
     # generate documents for tracks
     progress(1/3, desc="Tracks saved. Generating documents...")
     generate_docs(saved_ids)
@@ -81,25 +79,46 @@ def import_tracks(num_tracks: int, request: gr.Request, progress=gr.Progress()):
     embed_tracks(saved_ids)
     return len(saved_ids)
 
+def lookup_song(prompt: str, search_limit: int, prefetch_limit: int):
+    result = reranking_search_batch(prompt, search_limit=search_limit, prefetch_limit=prefetch_limit)
+    images = []
+    for point in result.points:
+        caption = f"{point.payload['track_name']} - {point.score:.2f}"
+        images.append((get_track_image(point.payload['track_id']), caption))
+    return images
+
 with gr.Blocks() as main_demo:
     m = gr.Markdown("Welcome to Gradio!") # gets overriden by greet
     with gr.Tab("Lookup Track"):
-        text_input = gr.Textbox()
-        text_output = gr.Textbox()
-        text_button = gr.Button("Flip")
+        with gr.Row():
+            search_limit = gr.Slider(label="Search Limit", minimum=1, maximum=20, value=5, step=1)
+            prefetch_limit = gr.Slider(label="Prefetch Limit", minimum=1, maximum=200, value=100, step=1)
+        with gr.Row():
+            prompt_input = gr.Textbox(label="Prompt", placeholder="Describe a track's album art")
+            text_button = gr.Button("Search")
+        lookup_output = gr.Gallery(label="Search Results", rows=4, object_fit="contain")
+        text_button.click(
+            lookup_song,
+            inputs=[prompt_input, search_limit, prefetch_limit],
+            outputs=lookup_output
+        )
     with gr.Tab("Import Library"):
         with gr.Row():
             num_tracks = gr.Number(label="Number of Tracks", value=10)
+            import_all = gr.Checkbox(label="Import All Saved Tracks", value=False)
             num_imported = gr.Number(label="Number of Imported Tracks", value=0)
         import_button = gr.Button("Import")
-        import_button.click(import_tracks, inputs=num_tracks, outputs=num_imported)
+        import_button.click(import_tracks, inputs=[num_tracks, import_all], outputs=num_imported)
     with gr.Tab("Document Lookup"):
         doc_output = gr.Textbox(label="Document Content")
         doc_button = gr.Button("Process Document")
-    gr.Button("Logout", link="/logout")
-    main_demo.load(greet, None, m)
+    with gr.Row():
+        auth_url = sp_oauth.get_authorize_url()
+        login_button = gr.Button("Login", link=auth_url)
+        logout_button = gr.Button("Logout", link="/logout")
+    main_demo.load(check_user_login_status, outputs=[m, login_button, logout_button])
 
-app = gr.mount_gradio_app(app, main_demo, path="/gradio", auth_dependency=get_user)
+app = gr.mount_gradio_app(app, main_demo, path="/")
 
 if __name__ == '__main__':
     uvicorn.run(app)
